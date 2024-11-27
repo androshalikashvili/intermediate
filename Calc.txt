@@ -1,0 +1,123 @@
+using System.Globalization;
+
+class Calculator
+{
+    static void Main(string[] args)
+    {
+        // Welcome message
+        Console.WriteLine("\n  Welcome to the Simple Calculator App\n");
+        Console.WriteLine("  You can perform operations (+, -, *, /) with two numbers\n");
+        Console.WriteLine("  For decimal numbers, use a dot (.) as the separator\n\n");
+
+        // Operations
+        double Add(double x, double y) => x + y;
+        double Minus(double x, double y) => x - y;
+        double Multiply(double x, double y) => x * y;
+        double Divide(double x, double y)
+        {
+            if (y != 0)
+                return x / y;
+            else
+                throw new DivideByZeroException("  Error: Division by zero is not allowed.\n");
+        }
+
+        // Function to validate number input
+        bool CheckInputNumber(string input, out double number)
+        {
+            return double.TryParse(input, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out number);
+        }
+
+        // Get a validated number
+        double GetValidatedNumber(string prompt)
+        {
+            double number;
+            while (true)
+            {
+                Console.Write(prompt);
+                string input = Console.ReadLine();
+
+                // Check only the format with a dot
+                if (CheckInputNumber(input, out number))
+                    break;
+                else
+                    Console.WriteLine("  Error: Please enter a valid number (integer or decimal, dot separator)!\n");
+            }
+            return number;
+        }
+
+        // Start with the first number
+        double result = GetValidatedNumber("  Enter a number: ");
+        bool continueCalculations = true;
+
+        while (continueCalculations)
+        {
+            // Select operation
+            string operation;
+            double nextNumber = 0;
+
+            Console.Write("\n  Select an operation (+, -, *, /): ");
+            operation = Console.ReadLine();
+
+            // Get the next number (unless the user chooses to exit)
+            if (operation == "+" || operation == "-" || operation == "*" || operation == "/")
+            {
+                nextNumber = GetValidatedNumber("\n  Enter the next number: ");
+            }
+            else
+            {
+                Console.WriteLine("  Error: Please select a valid operation.\n");
+                continue;
+            }
+
+            // Perform the operation
+            try
+            {
+                switch (operation)
+                {
+                    case "+":
+                        result = Add(result, nextNumber);
+                        break;
+                    case "-":
+                        result = Minus(result, nextNumber);
+                        break;
+                    case "*":
+                        result = Multiply(result, nextNumber);
+                        break;
+                    case "/":
+                        result = Divide(result, nextNumber);
+                        break;
+                }
+
+                Console.WriteLine($"\n  Result: {result}\n");
+            }
+            catch (DivideByZeroException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            // Ask the user what to do next
+            Console.WriteLine("  What would you like to do:\n  1) Continue with the current result\n  2) Enter a new number\n  3) Exit");
+            Console.Write("  Your choice (1, 2, 3): ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    // Continue with the current result
+                    continue;
+                case "2":
+                    // Enter a new number
+                    result = GetValidatedNumber("\n  Enter a new number: ");
+                    break;
+                case "3":
+                    // Exit the program
+                    continueCalculations = false;
+                    Console.WriteLine("\n  Thank you for using the calculator! Goodbye.\n");
+                    break;
+                default:
+                    Console.WriteLine("  Invalid choice. Continuing with the current result.\n");
+                    break;
+            }
+        }
+    }
+}
