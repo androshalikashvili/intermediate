@@ -1,0 +1,403 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Text.Json;
+
+
+class Program
+{
+    private static readonly string AdminPassword = "admin123";
+    static void Main()
+    {
+        string filePath = "accounts.json";
+
+        // Checking the presence of the file
+        EnsureFileExists(filePath);
+
+        while (true)
+        {
+            Console.Clear();
+            Console.WriteLine("Wellcom to ATM");
+            Console.WriteLine("1. LogIn");
+            Console.WriteLine("2. Registration");
+            Console.WriteLine("3. Account Management (Administrator)");
+            Console.WriteLine("5. Exit");
+            Console.Write("Your choice: ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    UserMenu(filePath);
+                    break;
+                case "2":
+                    RegisterNewUser(filePath);
+                    break;
+                case "3":
+                    AdminMenu(filePath);
+                    break;
+                case "5":
+                    Console.WriteLine("You have exited the program");
+                    return;
+                default:
+                    Console.WriteLine("Incorrect selection. Press any key to continue...");
+                    Console.ReadKey();
+                    break;
+            }
+        }
+    }
+
+    // User menu
+    static void UserMenu(string filePath)
+    {
+        var accounts = LoadAccounts(filePath);
+
+        Console.Write("Enter username: ");
+        string userName = Console.ReadLine();
+
+        Console.Write("Enter PIN: ");
+        string pin = Console.ReadLine();
+
+        var userAccount = accounts.Find(u => u.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase) && u.Pin == pin);
+
+        if (userAccount == null)
+        {
+            Console.WriteLine("Incorrect username or Pin.");
+            Console.ReadKey();
+            return;
+        }
+
+        LogAction($"User logged in: {userAccount.UserName}");
+
+        while (true)
+        {
+            Console.Clear();
+            Console.WriteLine($"Welcome, {userAccount.UserName}!");
+            Console.WriteLine("1. Show balance");
+            Console.WriteLine("2. Deposit money");
+            Console.WriteLine("3. Withdraw money");
+            Console.WriteLine("4. Change Pin");
+            Console.WriteLine("5. Exit");
+            Console.Write("Your choice: ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    Console.WriteLine($"Your balance: {userAccount.Balance} Gel.");
+                    break;
+                case "2":
+                    Console.Write("Enter the amount to deposit: ");
+                    if (decimal.TryParse(Console.ReadLine(), out decimal depositAmount) && depositAmount > 0)
+                    {
+                        userAccount.Balance += depositAmount;
+                        Console.WriteLine("The amount has been successfully deposited.");
+                        Console.WriteLine($"Your Balance is: {userAccount.Balance} Gel");
+                        LogAction($"User {userAccount.UserName} deposited {depositAmount} GEL. New balance: {userAccount.Balance} GEL.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Incorrect amount.");
+                    }
+                    break;
+                case "3":
+                    Console.Write("Enter the amount to withdraw: ");
+                    if (decimal.TryParse(Console.ReadLine(), out decimal withdrawAmount) && withdrawAmount > 0)
+                    {
+                        if (withdrawAmount <= userAccount.Balance)
+                        {
+                            userAccount.Balance -= withdrawAmount;
+                            Console.WriteLine("The amount has been successfully withdrawn..");
+                            Console.WriteLine($"Your Balance is: {userAccount.Balance} Gel");
+                            LogAction($"User {userAccount.UserName} withdrew {withdrawAmount} GEL. New balance: {userAccount.Balance} GEL.");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Insufficient funds.");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Incorrect amount.");
+                    }
+                    break;
+                case "4":
+                    Console.Write("Enter your current Pin: ");
+                    string currentPin = Console.ReadLine();
+
+                    if (currentPin == userAccount.Pin)
+                    {
+                        string newPin;
+                        while (true)
+                        {
+                            Console.Write("Enter New PIN code (4 digits): ");
+                            newPin = Console.ReadLine();
+
+                            if (ValidatePin(newPin))
+                            {
+                                break;
+                            }
+
+                            Console.WriteLine("Incorrect PIN code. Try again.");
+                        }
+                        userAccount.Pin = newPin;
+                        Console.WriteLine("PIN code successfully changed.");
+                        LogAction($"User: {userAccount.UserName} change PIN");
+                    }
+                    else
+                    {
+                        Console.WriteLine("The current pin is incorrect..");
+                    }
+                    break;
+                case "5":
+                    SaveAccounts(filePath, accounts);
+                    return;
+                default:
+                    Console.WriteLine("Wrong choice.");
+                    break;
+            }
+
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
+    }
+
+    // New User Registration
+    static void RegisterNewUser(string filePath)
+    {
+        var accounts = LoadAccounts(filePath);
+
+        string userName;
+        while (true)
+        {         
+            Console.Write("Enter username (max 10 characters, letters and digits only): "); 
+            userName = Console.ReadLine();
+
+            // Check that the name consists only of letters and numbers and is no longer than 10 characters
+
+            if (userName.Length > 10 || !System.Text.RegularExpressions.Regex.IsMatch(userName, @"^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z0-9]{1,10}$"))
+            //if (userName.Length > 10 || !System.Text.RegularExpressions.Regex.IsMatch(userName, @"^[a-zA-Z0-9]+$"))
+            {
+                Console.WriteLine("Username must be up to 10 characters long and can only contain letters and digits.");
+                //Console.ReadKey();
+                //return;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Checking for uniqueness of username
+        if (accounts.Exists(u => u.UserName.Equals(userName, StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.WriteLine("This username already exists.");
+            Console.ReadKey();
+            return;
+        }
+
+        Console.Write("");
+        Console.WriteLine("Registration completed successfully.");
+        LogAction($"New user registered: {userName}");
+
+
+        // Set and Check PIN code
+        string pin;
+        while (true)
+        {
+            Console.Write("Enter PIN code (4 digits): ");
+            pin = Console.ReadLine();
+
+            if (ValidatePin(pin))
+            {
+                break;
+            }
+
+            Console.WriteLine("Incorrect PIN code. Try again (only 4 digits).");
+        }
+
+        accounts.Add(new UserAccount
+        {
+            UserName = userName,
+            Balance = 0,
+            Pin = pin
+        });
+
+        SaveAccounts(filePath, accounts);
+        Console.WriteLine("Registration completed successfully.");
+
+        Console.ReadKey();
+    }
+
+    // Admin menu
+    static void AdminMenu(string filePath)
+    {
+        Console.Write("Enter the administrator pin: ");
+        string inputpin = Console.ReadLine();
+
+        if (inputpin != AdminPassword)
+        {
+            Console.WriteLine("Incorrect pin.");
+            Console.ReadKey();
+            return;
+        }
+
+        var accounts = LoadAccounts(filePath);
+        LogAction("Admin logged in.");
+
+        while (true)
+        {
+            Console.Clear();
+            Console.WriteLine("Account Management:");
+            Console.WriteLine("1. View all users");
+            Console.WriteLine("2. Add new user");
+            Console.WriteLine("3. Delete user");
+            Console.WriteLine("4. Reset user PIN");
+            Console.WriteLine("5. Return to main menu");
+            Console.Write("Your choice: ");
+            string choice = Console.ReadLine();
+
+            switch (choice)
+            {
+                case "1":
+                    Console.WriteLine("\nList of users:");
+                    foreach (var account in accounts)
+                    {
+                        Console.WriteLine($"Name: {account.UserName}, Balance: {account.Balance} Gel.");
+                    }
+                    break;
+
+                case "2":
+                    Console.Write("Enter the new user name: ");
+                    string newUserName = Console.ReadLine();
+                    Console.Write("Enter the opening balance: ");
+                    if (decimal.TryParse(Console.ReadLine(), out decimal initialBalance) && initialBalance >= 0)
+                    {
+                        Console.Write("Enter Pin: ");
+                        string newPin = Console.ReadLine();
+
+                        accounts.Add(new UserAccount
+                        {
+                            UserName = newUserName,
+                            Balance = initialBalance,
+                            Pin = newPin
+                        });
+
+                        Console.WriteLine("User added successfully.");
+                        LogAction($"Admin added new user: {newUserName} with balance {initialBalance} GEL.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Incorrect input.");
+                    }
+                    break;
+
+                case "3":
+                    Console.Write("Enter username to delete: ");
+                    string userToDelete = Console.ReadLine();
+                    var user = accounts.Find(u => u.UserName.Equals(userToDelete, StringComparison.OrdinalIgnoreCase));
+
+                    if (user != null)
+                    {
+                        accounts.Remove(user);
+                        Console.WriteLine("User successfully deleted.");
+                        LogAction($"Admin deleted user: {userToDelete}.");
+                    }
+                    else
+                    {
+                        Console.WriteLine("User not found.");
+                    }
+                    break;
+                case "4":
+                    Console.Write("Enter the username to reset PIN: ");
+                    string userToResetPin = Console.ReadLine();
+                    var accountToReset = accounts.Find(u => u.UserName.Equals(userToResetPin, StringComparison.OrdinalIgnoreCase));
+
+                    if (accountToReset != null)
+                    {
+                        string newPin;
+                        while (true)
+                        {
+                            Console.Write("Enter new PIN code (4 digits): ");
+                            newPin = Console.ReadLine();
+
+                            if (ValidatePin(newPin))
+                            {
+                                break;
+                            }
+
+                            Console.WriteLine("Invalid PIN. Please enter a 4-digit number.");
+                        }
+
+                        accountToReset.Pin = newPin;
+                        Console.WriteLine($"PIN for user {accountToReset.UserName} has been successfully reset.");
+                        LogAction($"Admin reset PIN for user: {accountToReset.UserName}");
+                    }
+                    else
+                    {
+                        Console.WriteLine("User not found.");
+                    }
+                    break;
+
+                case "5":
+                    SaveAccounts(filePath, accounts);
+                    return;
+
+                default:
+                    Console.WriteLine("Wrong choice.");
+                    break;
+            }
+
+            Console.WriteLine("Press any key to continue...");
+            Console.ReadKey();
+        }
+    }
+
+    // PIN code checking
+    static bool ValidatePin(string pin)
+    {
+        return pin.Length == 4 && int.TryParse(pin, out _);
+    }
+
+
+    // working with files
+    static void EnsureFileExists(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            var defaultAccounts = new List<UserAccount>();
+            File.WriteAllText(filePath, JsonSerializer.Serialize(defaultAccounts, new JsonSerializerOptions { WriteIndented = true }));
+        }
+    }
+
+    static List<UserAccount> LoadAccounts(string filePath)
+    {
+        var json = File.ReadAllText(filePath);
+        return JsonSerializer.Deserialize<List<UserAccount>>(json) ?? new List<UserAccount>();
+    }
+
+    static void SaveAccounts(string filePath, List<UserAccount> accounts)
+    {
+        var json = JsonSerializer.Serialize(accounts, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(filePath, json);
+    }
+
+    static void LogAction(string message)
+    {
+        string logFilePath = "atm_logs.txt";
+        string logEntry = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}";
+
+        File.AppendAllText(logFilePath, logEntry + Environment.NewLine);
+    }
+
+}
+
+
+public class UserAccount
+{
+    public string UserName { get; set; }
+    public decimal Balance { get; set; }
+    public string Pin { get; set; }
+}
+
+

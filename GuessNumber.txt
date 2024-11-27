@@ -1,0 +1,53 @@
+
+Random random = new Random();
+int secretNumber = random.Next(1, 101);
+
+// Attempt counter
+int countAttempts = 0;
+
+Console.WriteLine("\n  Welcome to the game!");
+Console.WriteLine("\n  Try to guess a number from 1 to 100.\n");
+
+while (true)
+{
+    // Receive player input with verification
+    int guess = InputOnlyNumber();
+
+    // Increasing the number of attempts
+    countAttempts++;
+
+    // Check if the guess is correct
+    if (guess == secretNumber)
+    {
+        Console.WriteLine($"\n  YES! You guessed it right {countAttempts} attemps.\n");
+        break;
+    }
+    else if (guess < secretNumber)
+    {
+        Console.WriteLine("  Too low! Try again.\n");
+    }
+    else
+    {
+        Console.WriteLine("  Too high! Try again.\n");
+    }
+}
+
+// this function check input value(must be integer)
+int InputOnlyNumber()
+{
+    while (true)
+    {
+        Console.Write("  Enter your guess: ");
+        string input = Console.ReadLine();
+        Console.WriteLine();
+
+        if (int.TryParse(input, out int guess) && guess >= 1 && guess <= 100)
+        {
+            return guess;
+        }
+        else
+        {
+            Console.WriteLine("  Please enter a number between 1 and 100.\n");
+        }
+    }
+}
